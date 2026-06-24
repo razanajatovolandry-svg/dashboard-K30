@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tableau de Bord Collaboratif Instantané</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4F6F1; --surface:#FFFFFF; --ink:#10160F; --ink-soft:#52604F; --line:#DCE3D5;
+    --pitch:#2F6B3C; --pitch-dark:#1E4A29; --pitch-pale:#E7F0E3; --flood:#FFC93C;
+    --alert:#C0392B; --radius:14px; --shadow:0 2px 14px rgba(16,22,15,0.07); --maxw:1000px;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;line-height:1.45;}
+  h1,h2,h3,.scorebox .num,.cat-card .pct{font-family:'Oswald',sans-serif;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 16px 60px;}
+  .hidden{display:none !important;}
+
+  /* HEADER */
+  header.top{background:linear-gradient(160deg,var(--pitch),var(--pitch-dark));color:#fff;padding:18px 16px;border-bottom:4px solid var(--flood);}
+  .top-inner{max-width:var(--maxw);margin:0 auto;}
+  .top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+  .event-id h1{font-size:1.35rem;margin:0 0 2px;}
+  .event-id .sub{font-size:.85rem;opacity:.85;margin:0;}
+  .edit-event-btn{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:6px 10px;font-size:.75rem;cursor:pointer;}
+
+  .scoreboard{margin-top:16px;background:#0E1410;border-radius:12px;padding:12px;display:flex;gap:8px;justify-content:center;}
+  .scorebox{text-align:center;min-width:70px;}
+  .scorebox .num{font-size:1.9rem;color:var(--flood);line-height:1;}
+  .scorebox .lbl{font-size:.62rem;text-transform:uppercase;color:#cdd6c8;}
+
+  .overall-bar-wrap{margin-top:14px;}
+  .overall-bar-label{display:flex;justify-content:space-between;font-size:.78rem;}
+  .bar-track{background:rgba(255,255,255,.18);border-radius:8px;height:10px;overflow:hidden;}
+  .bar-fill{background:var(--flood);height:100%;transition:width .4s;}
+
+  /* PANELS */
+  .history-panel, .synergy-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-top:18px;box-shadow:var(--shadow);}
+  .history-panel summary, .synergy-panel summary{padding:13px 16px;font-weight:600;cursor:pointer;}
+  .history-list{max-height:180px;overflow-y:auto;padding-left:0;list-style:none;margin:0;}
+  .history-item{padding:6px 16px;border-bottom:1px dashed var(--line);font-size:0.8rem;}
+  .history-timestamp{color:var(--ink-soft);margin-right:6px;}
+  .history-user{background:var(--pitch-pale);color:var(--pitch-dark);padding:2px 6px;border-radius:4px;font-weight:600;margin-right:6px;}
+
+  /* GRID & CARDS */
+  .section-title{font-size:1.02rem;font-weight:600;margin:26px 0 10px;}
+  .overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+  .cat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px;cursor:pointer;border-top:4px solid var(--cat-color);}
+  .cat-card.active{outline:3px solid var(--pitch-dark);}
+  .cat-card .head{font-size:.82rem;font-weight:600;margin-bottom:8px;}
+  .cat-card .pct{font-size:1.3rem;font-weight:700;}
+
+  /* CONTROLS & TASKS */
+  .controls{display:flex;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-top:22px;}
+  .controls input, .controls select{border:1px solid var(--line);border-radius:8px;padding:9px;font-size:.85rem;}
+  .control-field{display:flex;flex-direction:column;flex:1;}
+  .btn{border:none;border-radius:9px;padding:10px 16px;font-weight:600;cursor:pointer;}
+  .btn-primary{background:var(--pitch);color:#fff;}
+  .btn-ghost{background:transparent;border:1px solid var(--line);}
+  
+  .task-list{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+  .task-card{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--cat-color);border-radius:var(--radius);padding:14px;}
+  .task-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .pill{padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:600;}
+  .pill-status{border:none;cursor:pointer;}
+  .pill-todo{background:#EDEFE9;} .pill-in_progress{background:#FFEFC4;} .pill-done{background:#DFF1E1;}
+
+  /* MODALS */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:100;}
+  .modal{background:#fff;padding:24px;border-radius:16px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:.8rem;font-weight:600;margin-bottom:4px;}
+  .field input, .field select, .field textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="top-row">
+      <div class="event-id">
+        <h1 id="eventNameDisplay">Synchronisation cloud...</h1>
+        <p class="sub" id="eventSubDisplay">---</p>
+      </div>
+      <button class="edit-event-btn" id="editEventBtn" type="button">✏️ Modifier l'événement</button>
+    </div>
+    <div class="scoreboard" id="scoreboard"></div>
+    <div class="overall-bar-wrap">
+      <div class="overall-bar-label"><span id="overallLabel">0 tâches</span><span id="overallPct">0%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="overallFill" style="width:0%"></div></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <details class="history-panel" open>
+    <summary>📜 Historique des modifications en direct</summary>
+    <ul class="history-list" id="historyList"></ul>
+  </details>
+
+  <h2 class="section-title">📊 Suivi par Pôle</h2>
+  <div class="overview-grid" id="overviewGrid"></div>
+
+  <h2 class="section-title">🗂️ Liste des Tâches</h2>
+  <div class="controls">
+    <div class="control-field"><input type="search" id="searchInput" placeholder="Rechercher..."></div>
+    <button class="btn btn-primary" id="addTaskBtn" type="button">+ Nouvelle tâche</button>
+  </div>
+
+  <div class="task-list" id="taskList"></div>
+
+  <footer style="margin-top:40px; display:flex; gap:10px; align-items:center;">
+    <span id="userProfileDisplay" style="font-size:0.85rem; font-weight:600;"></span>
+    <button class="btn btn-ghost" id="changeUserBtn">🔑 Changer de Token</button>
+    <button class="btn btn-ghost" id="resetBtn" style="color:var(--alert); margin-left:auto;">↺ Réinitialiser</button>
+  </footer>
+</main>
+
+<div class="modal-overlay hidden" id="loginModalOverlay">
+  <div class="modal">
+    <h2>🔑 Accès sécurisé</h2>
+    <form id="loginForm">
+      <div class="field">
+        <label>Votre Token d'accès unique :</label>
+        <input type="password" id="tokenInput" placeholder="admin, user1, user2..." required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Accéder au Tableau de Bord</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="taskModalOverlay">
+  <div class="modal">
+    <h2 id="taskModalTitle">Tâche</h2>
+    <form id="taskForm">
+      <input type="hidden" id="taskId">
+      <div class="field"><label>Titre</label><input type="text" id="taskTitle" required></div>
+      <div class="field"><label>Pôle</label><select id="taskCategory" required></select></div>
+      <div class="field"><label>Responsable</label><input type="text" id="taskOwner"></div>
+      <div class="field"><label>Statut</label>
+        <select id="taskStatus"><option value="todo">À faire</option><option value="in_progress">En cours</option><option value="done">Fait</option></select>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="taskNotes"></textarea></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="btn btn-ghost" id="deleteTaskBtn" style="color:var(--alert); margin-right:auto;">Supprimer</button>
+        <button type="button" class="btn btn-ghost" id="cancelTaskBtn">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // Identifiant de synchronisation unique aléatoire pour votre projet
+  var SYNC_KEY = "event_dash_shared_prod_2026";
+  // Utilisation d'une API de stockage JSON publique et gratuite
+  var CLOUD_URL = "https://jsonbin.org/anon/" + SYNC_KEY; 
+
+  var ALLOWED_USERS = {
+    "admin": { name: "Administrateur", role: "admin" },
+    "user1": { name: "Sarah (Com)", role: "user" },
+    "user2": { name: "Thomas (Log)", role: "user" },
+    "user3": { name: "Marc (Tech)", role: "user" }
+  };
+
+  var currentUser = null;
+  var CATEGORIES = [
+    {id:"admin", label:"Administratif", icon:"📋", color:"#2F6B3C"},
+    {id:"stade", label:"Logistique", icon:"🏟️", color:"#1F4E5F"},
+    {id:"securite", label:"Sécurité", icon:"🛟", color:"#B23A2E"},
+    {id:"programme", label:"Programme", icon:"🎤", color:"#6A4C93"},
+    {id:"communication", label:"Communication", icon:"📣", color:"#C9821E"}
+  ];
+
+  var state = {
+    event: { name: "Culte & Festival International", place: "Stade", date: "2026-08-08" },
+    tasks: [],
+    history: []
+  };
+
+  // --- RECONSTRUCTION DU CLOUD ENGINE (VRAI COLLABORATIF SANS CONFIGURATION) ---
+  async function syncCloud(action = "fetch", dataToWrite = null) {
+    try {
+      if (action === "push" && dataToWrite) {
+        await fetch(CLOUD_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dataToWrite)
+        });
+        return dataToWrite;
+      } else {
+        let response = await fetch(CLOUD_URL);
+        if (response.ok) {
+          let resData = await response.json();
+          // Si l'API renvoie un objet vide au premier lancement
+          if (!resData || Object.keys(resData).length === 0) return null;
+          return resData;
+        }
+        return null;
+      }
+    } catch (e) {
+      console.error("Erreur de synchronisation Cloud:", e);
+      return null;
+    }
+  }
+
+  function startSyncLoop() {
+    fillCategorySelects();
+    
+    async function refresh() {
+      let cloudData = await syncCloud("fetch");
+      if (cloudData && cloudData.tasks) {
+        state = cloudData;
+      } else {
+        if (currentUser && currentUser.role === "admin" && state.tasks.length === 0) {
+          buildDefaults();
+          return;
+        }
+      }
+      renderAll();
+    }
+
+    refresh();
+    setInterval(refresh, 4000); // Récupère les modifications des autres toutes les 4 secondes
+  }
+
+  async function pushState() {
+    renderAll();
+    await syncCloud("push", state);
+  }
+
+  function logAction(msg) {
+    state.history.unshift({
+      user: currentUser ? currentUser.name : "Inconnu",
+      time: new Date().toLocaleTimeString("fr-FR"),
+      text: msg
+    });
+    if(state.history.length > 30) state.history.pop();
+    pushState();
+  }
+
+  function buildDefaults() {
+    state.tasks = [
+      { id: "1", title: "Déposer la demande d'occupation du stade", category: "admin", owner: "Marie", status: "todo", notes: "" },
+      { id: "2", title: "Recruter le prestataire de sécurité", category: "securite", owner: "Thomas", status: "in_progress", notes: "" }
+    ];
+    state.history = [{ user: "Système", time: "00:00", text: "Plateforme collaborative initialisée avec succès." }];
+    pushState();
+  }
+
+  // --- SÉCURITÉ ---
+  function checkAuth() {
+    var saved = sessionStorage.getItem("app_token");
+    if (saved && ALLOWED_USERS[saved]) {
+      currentUser = ALLOWED_USERS[saved];
+      document.getElementById("userProfileDisplay").textContent = `Session : ${currentUser.name}`;
+      document.getElementById("loginModalOverlay").classList.add("hidden");
+      startSyncLoop();
+    } else {
+      document.getElementById("loginModalOverlay").classList.remove("hidden");
+    }
+  }
+
+  document.getElementById("loginForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var t = document.getElementById("tokenInput").value.trim();
+    if(ALLOWED_USERS[t]) {
+      sessionStorage.setItem("app_token", t);
+      location.reload();
+    } else {
+      alert("Identifiant inconnu.");
+    }
+  });
+
+  document.getElementById("changeUserBtn").addEventListener("click", function(){
+    sessionStorage.removeItem("app_token");
+    location.reload();
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    if(currentUser.role !== "admin") return alert("🔒 Réservé à l'Admin.");
+    if(confirm("Réinitialiser l'espace partagé ?")) { buildDefaults(); }
+  });
+
+  // --- INTERFACE RENDUS ---
+  function fillCategorySelects() {
+    var ts = document.getElementById("taskCategory"); ts.innerHTML = "";
+    CATEGORIES.forEach(c => ts.innerHTML += `<option value="${c.id}">${c.icon} ${c.label}</option>`);
+  }
+
+  function renderAll() {
+    document.getElementById("eventNameDisplay").textContent = state.event.name || "Événement";
+    document.getElementById("eventSubDisplay").textContent = `${state.event.place || 'Lieu'} — ${state.event.date || ''}`;
+    
+    // Scoreboard
+    var total = state.tasks.length, done = state.tasks.filter(t => t.status === "done").length;
+    var pct = total > 0 ? Math.round((done/total)*100) : 0;
+    document.getElementById("overallLabel").textContent = `${done} / ${total} faites`;
+    document.getElementById("overallPct").textContent = `${pct}%`;
+    document.getElementById("overallFill").style.width = `${pct}%`;
+    
+    document.getElementById("scoreboard").innerHTML = `
+      <div class="scorebox"><div class="num">${total}</div><div class="lbl">Tâches</div></div>
+      <div class="scorebox"><div class="num" style="color:#9BD6A6">${done}</div><div class="lbl">Faites</div></div>
+    `;
+
+    // Pôles
+    var grid = document.getElementById("overviewGrid"); grid.innerHTML = "";
+    CATEGORIES.forEach(c => {
+      var tks = state.tasks.filter(t => t.category === c.id);
+      var p = tks.length > 0 ? Math.round((tks.filter(t=>t.status==="done").length / tks.length)*100) : 0;
+      grid.innerHTML += `<div class="cat-card" style="--cat-color:${c.color}"><div class="head">${c.icon} ${c.label}</div><div class="pct">${p}%</div></div>`;
+    });
+
+    // Liste des Tâches
+    var list = document.getElementById("taskList"); list.innerHTML = "";
+    var s = document.getElementById("searchInput").value.toLowerCase();
+    state.tasks.forEach(t => {
+      if(s && !t.title.toLowerCase().includes(s)) return;
+      var c = CATEGORIES.find(cat => cat.id === t.category) || CATEGORIES[0];
+      var div = document.createElement("div");
+      div.className = "task-card"; div.style.setProperty("--cat-color", c.color);
+      div.innerHTML = `
+        <div class="task-top">
+          <div>
+            <h3 style="margin:0 0 6px 0;">${t.title}</h3>
+            <span style="font-size:0.75rem; color:var(--ink-soft);">👤 ${t.owner || 'Non assigné'}</span>
+          </div>
+          <div>
+            <button class="pill pill-status pill-${t.status}" id="status-${t.id}">${t.status.toUpperCase()}</button>
+            <button class="btn btn-ghost" style="padding:4px 8px;" id="edit-${t.id}">✏️</button>
+          </div>
+        </div>
+      `;
+      
+      div.querySelector(`#status-${t.id}`).addEventListener("click", function(){
+        var old = t.status;
+        t.status = t.status === "todo" ? "in_progress" : t.status === "in_progress" ? "done" : "todo";
+        logAction(`Tâche "${t.title}" changée de [${old}] à [${t.status}]`);
+      });
+      div.querySelector(`#edit-${t.id}`).addEventListener("click", () => openTaskModal(t.id));
+      list.appendChild(div);
+    });
+
+    // Historique
+    var hl = document.getElementById("historyList"); hl.innerHTML = "";
+    if(state.history) {
+      state.history.forEach(h => {
+        hl.innerHTML += `<li class="history-item"><span class="history-timestamp">[${h.time}]</span><span class="history-user">${h.user}</span> ${h.text}</li>`;
+      });
+    }
+  }
+
+  // --- MODAL TÂCHES ---
+  function openTaskModal(id = null) {
+    var f = document.getElementById("taskForm"); f.reset();
+    if(id) {
+      var t = state.tasks.find(tk => tk.id === id);
+      document.getElementById("taskId").value = t.id;
+      document.getElementById("taskTitle").value = t.title;
+      document.getElementById("taskCategory").value = t.category;
+      document.getElementById("taskOwner").value = t.owner;
+      document.getElementById("taskStatus").value = t.status;
+      document.getElementById("taskNotes").value = t.notes;
+      document.getElementById("deleteTaskBtn").classList.remove("hidden");
+    } else {
+      document.getElementById("taskId").value = "";
+      document.getElementById("deleteTaskBtn").classList.add("hidden");
+    }
+    document.getElementById("taskModalOverlay").classList.remove("hidden");
+  }
+
+  document.getElementById("taskForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var id = document.getElementById("taskId").value;
+    var tData = {
+      id: id || "t_" + Date.now(),
+      title: document.getElementById("taskTitle").value,
+      category: document.getElementById("taskCategory").value,
+      owner: document.getElementById("taskOwner").value,
+      status: document.getElementById("taskStatus").value,
+      notes: document.getElementById("taskNotes").value
+    };
+
+    if(id) {
+      var idx = state.tasks.findIndex(tk => tk.id === id);
+      state.tasks[idx] = tData;
+      logAction(`Modifié la tâche: "${tData.title}"`);
+    } else {
+      state.tasks.push(tData);
+      logAction(`Créé la tâche: "${tData.title}"`);
+    }
+    document.getElementById("taskModalOverlay").classList.add("hidden");
+  });
+
+  document.getElementById("deleteTaskBtn").addEventListener("click", function(){
+    var id = document.getElementById("taskId").value;
+    var idx = state.tasks.findIndex(tk => tk.id === id);
+    if(idx !== -1) {
+      logAction(`Supprimé la tâche: "${state.tasks[idx].title}"`);
+      state.tasks.splice(idx, 1);
+      document.getElementById("taskModalOverlay").classList.add("hidden");
+    }
+  });
+
+  document.getElementById("cancelTaskBtn").addEventListener("click", () => document.getElementById("taskModalOverlay").classList.add("hidden"));
+  document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
+  document.getElementById("searchInput").addEventListener("input", renderAll);
+
+  window.addEventListener("DOMContentLoaded", checkAuth);
+})();
+</script>
+</body>
+</html>
